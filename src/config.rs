@@ -53,30 +53,35 @@ fn parse_linear(content: &str) -> Result<LinearConfig> {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        if trimmed.ends_with(':') && !trimmed.contains(' ') && !trimmed.starts_with('-') {
-            if let Some(key) = current_key.take() {
+        if trimmed.ends_with(':') && !trimmed.starts_with('-') {
+            // Flush previous key if it was ignore
+            if let Some(ref key) = current_key {
                 if key == "ignore" {
                     ignore = Some(current_list.clone());
                     current_list.clear();
                 }
             }
-            current_key = Some(trimmed.trim_end_matches(':').to_string());
+            current_key = Some(trimmed.trim_end_matches(':').trim().to_string());
             continue;
         }
         if trimmed.starts_with('-') {
+            let item = trimmed.trim_start_matches('-').trim().to_string();
             if let Some(ref key) = current_key {
                 if key == "ignore" {
-                    let item = trimmed.trim_start_matches('-').trim().to_string();
-                    current_list.push(item);
+                    current_list.push(item.clone());
                     continue;
                 }
             }
-            let item = trimmed.trim_start_matches('-').trim().to_string();
+            // If not in a specific list context, might be ignore items
+            if current_key.as_deref() == Some("ignore") {
+                current_list.push(item.clone());
+                continue;
+            }
             current_list.push(item);
             continue;
         }
         if trimmed.contains(':') {
-            if let Some(key) = current_key.take() {
+            if let Some(ref key) = current_key {
                 if key == "ignore" {
                     ignore = Some(current_list.clone());
                     current_list.clear();
@@ -87,11 +92,25 @@ fn parse_linear(content: &str) -> Result<LinearConfig> {
             let value = parts.next().unwrap().trim().to_string();
             if key == "project" {
                 project = Some(value);
+                current_key = None;
+                continue;
             }
+            if key == "ignore" {
+                current_key = Some("ignore".to_string());
+                continue;
+            }
+            current_key = None;
             continue;
         }
+        // List item without dash
+        if let Some(ref key) = current_key {
+            if key == "ignore" {
+                current_list.push(trimmed.to_string());
+                continue;
+            }
+        }
     }
-    if let Some(key) = current_key {
+    if let Some(ref key) = current_key {
         if key == "ignore" {
             ignore = Some(current_list);
         }
@@ -107,7 +126,6 @@ fn parse_linear(content: &str) -> Result<LinearConfig> {
 fn parse_linearcmd(content: &str) -> Result<LinearCmdConfig> {
     let mut build_dir: Option<String> = None;
     let mut artifacts: Vec<String> = Vec::new();
-    let mut current_key: Option<String> = None;
     let mut in_artifacts = false;
     
     for line in content.lines() {
@@ -116,7 +134,6 @@ fn parse_linearcmd(content: &str) -> Result<LinearCmdConfig> {
             continue;
         }
         if trimmed == "artifacts:" {
-            current_key = Some("artifacts".to_string());
             in_artifacts = true;
             continue;
         }
@@ -124,10 +141,9 @@ fn parse_linearcmd(content: &str) -> Result<LinearCmdConfig> {
             in_artifacts = false;
             let mut parts = trimmed.splitn(2, ':');
             let key = parts.next().unwrap().trim();
+            let value = parts.next().unwrap().trim();
             if key == "build_dir" {
-                let value = parts.next().unwrap().trim().to_string();
-                build_dir = Some(value);
-                current_key = Some("build_dir".to_string());
+                build_dir = Some(value.to_string());
             }
             continue;
         }
@@ -138,17 +154,17 @@ fn parse_linearcmd(content: &str) -> Result<LinearCmdConfig> {
             let value = parts.next().unwrap().trim().to_string();
             if key == "build_dir" {
                 build_dir = Some(value);
+                continue;
             }
-            continue;
-        }
-        if trimmed.starts_with('-') && in_artifacts {
-            let item = trimmed.trim_start_matches('-').trim().to_string();
-            artifacts.push(item);
             continue;
         }
         if trimmed.starts_with('-') {
             let item = trimmed.trim_start_matches('-').trim().to_string();
-            artifacts.push(item);
+            if in_artifacts {
+                artifacts.push(item);
+            } else {
+                artifacts.push(item);
+            }
             continue;
         }
     }

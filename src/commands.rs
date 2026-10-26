@@ -44,35 +44,47 @@ pub fn run() -> Result<()> {
                     }
                     if let Some(ref ignore) = cfg.ignore {
                         if !ignore.is_empty() {
-                            println!("  Ignored patterns: {}", ignore.join(", "));
+                            println!("  Ignored patterns:");
+                            for item in ignore {
+                                println!("    - {}", item);
+                            }
                         }
                     }
                 }
-                Err(_) => {
-                    println!("{} .linear not found or invalid", "[WARN]".yellow());
+                Err(e) => {
+                    println!("{} .linear error: {}", "[WARN]".yellow(), e);
                 }
             }
             match config::load_linearcmd_config() {
                 Ok(cfg) => {
                     println!("{} .linearcmd found", "[OK]".green());
                     println!("  Build dir: {}", cfg.build_dir);
-                    println!("  Artifacts: {}", cfg.artifacts.join(", "));
+                    println!("  Artifacts:");
+                    for a in &cfg.artifacts {
+                        println!("    - {}", a);
+                    }
                 }
                 Err(e) => {
-                    println!("{} .linearcmd: {}", "[ERR]".red(), e);
+                    println!("{} .linearcmd error: {}", "[ERR]".red(), e);
+                    eprintln!("{} Create .linearcmd with build_dir and artifacts, or run 'linearcmd init'", "[FIX]".yellow());
                 }
             }
         }
         Commands::Build => {
             println!("{} Smart build detection...", "[LINEARCMD]".green().bold());
             println!("{} Scanning for build scripts...", "[INFO]".cyan());
-            let build_files = vec!["package.json", "Makefile", "CMakeLists.txt", "Cargo.toml", "build.gradle", "pom.xml"];
+            let build_files = vec!["package.json", "Makefile", "CMakeLists.txt", "Cargo.toml", "build.gradle", "pom.xml", "meson.build"];
+            let mut found = false;
             for f in build_files {
                 if std::path::Path::new(f).exists() {
                     println!("{} Found {}", "[OK]".green(), f);
+                    found = true;
                 }
             }
-            println!("{} Use your native build tool, then run 'linearcmd release'", "[INFO]".cyan());
+            if !found {
+                println!("{} No common build files detected", "[WARN]".yellow());
+            }
+            println!("{} Use your native build tool to compile, then run 'linearcmd release'", "[INFO]".cyan());
         }
         Commands::Release => {
             if let Err(e) = release::run_release() {
@@ -84,12 +96,12 @@ pub fn run() -> Result<()> {
         Commands::Help => {
             println!("{} Contextual Code Help", "[LINEARCMD]".green().bold());
             println!();
-            println!("{} Quick Diagnostics:", "Tips:".cyan().bold());
+            println!("{} Quick Diagnostics:", "[TIPS]".cyan().bold());
             println!("  - Config issues: Run 'linearcmd config' to check");
-            println!("  - Missing artifacts: Ensure build outputs match .linearcmd");
+            println!("  - Missing artifacts: Ensure build outputs exist in build_dir or current dir");
             println!("  - Release failed: Check GITHUB_TOKEN and GITHUB_REPO env vars");
             println!();
-            println!("{} Tips:", "Usage:".cyan().bold());
+            println!("{} Usage:", "[GUIDE]".cyan().bold());
             println!("  - Create .linear for ignore patterns and project settings");
             println!("  - Create .linearcmd with build_dir and artifacts list");
             println!("  - Run 'linearcmd release' for one-command publishing");

@@ -1,0 +1,10 @@
+# Files and folders to skip
+ignore:
+  node_modules/
+  build/
+  dist/
+  *.log
+  .env
+
+# Optional project settings
+# project: MyProject

@@ -1,0 +1,6 @@
+# Tell linearcmd where your compiled assets live
+build_dir: ./dist
+
+# Specify output binaries/archives to attach to the release
+artifacts:
+  - app.exe
